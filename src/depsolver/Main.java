@@ -15,23 +15,54 @@ class Package {
   private List<List<String>> depends = new ArrayList<>();
   private List<String> conflicts = new ArrayList<>();
 
-  public String getName() { return name; }
-  public String getVersion() { return version; }
-  public Integer getSize() { return size; }
-  public List<List<String>> getDepends() { return depends; }
-  public List<String> getConflicts() { return conflicts; }
-  public void setName(String name) { this.name = name; }
-  public void setVersion(String version) { this.version = version; }
-  public void setSize(Integer size) { this.size = size; }
-  public void setDepends(List<List<String>> depends) { this.depends = depends; }
-  public void setConflicts(List<String> conflicts) { this.conflicts = conflicts; }
+  public String getName() {
+    return name;
+  }
+
+  public String getVersion() {
+    return version;
+  }
+
+  public Integer getSize() {
+    return size;
+  }
+
+  public List<List<String>> getDepends() {
+    return depends;
+  }
+
+  public List<String> getConflicts() {
+    return conflicts;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public void setVersion(String version) {
+    this.version = version;
+  }
+
+  public void setSize(Integer size) {
+    this.size = size;
+  }
+
+  public void setDepends(List<List<String>> depends) {
+    this.depends = depends;
+  }
+
+  public void setConflicts(List<String> conflicts) {
+    this.conflicts = conflicts;
+  }
 }
 
 public class Main {
   public static void main(String[] args) throws IOException {
-    TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {};
+    TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {
+    };
     List<Package> repo = JSON.parseObject(readFile(args[0]), repoType);
-    TypeReference<List<String>> strListType = new TypeReference<List<String>>() {};
+    TypeReference<List<String>> strListType = new TypeReference<List<String>>() {
+    };
     List<String> initial = JSON.parseObject(readFile(args[1]), strListType);
     List<String> constraints = JSON.parseObject(readFile(args[2]), strListType);
 
