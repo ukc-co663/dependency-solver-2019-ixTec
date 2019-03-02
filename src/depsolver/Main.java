@@ -147,8 +147,8 @@ public class Main {
 
         List<String> finalState = depthFirstSearch(initial);
 
-        if(!commands.isEmpty()) {
-            System.out.println(JSON.toJSONString(commands));
+        if (!commands.isEmpty()) {
+            System.out.println(JSON.toJSONString(commands, true));
         }
     }
 
@@ -165,7 +165,7 @@ public class Main {
             return state;
         }
 
-        if (!state.isEmpty() && !isValidState(state)) {  
+        if (!state.isEmpty() && !isValidState(state)) {
             return state;
         }
 
@@ -190,8 +190,8 @@ public class Main {
                 commands.remove("+" + pack);
             } else {
                 newState.add(pack);
-                
-                if(!commands.contains("+" + pack)) {
+
+                if (!commands.contains("+" + pack)) {
                     commands.add("+" + pack);
                 }
             }
@@ -244,7 +244,7 @@ public class Main {
         if (conflict.contains("<=")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-            
+
             if (state.stream()
                     .filter(p -> Integer.parseInt(p.getVersion()) <= packageVersion && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
@@ -317,7 +317,7 @@ public class Main {
             } else if (dep.contains("<")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("<") + 1));
- 
+
                 if (state.stream().filter(
                         p -> Integer.parseInt(p.getVersion()) < packageVersion && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
