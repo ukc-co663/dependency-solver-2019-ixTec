@@ -59,31 +59,6 @@ class Package {
     }
 }
 
-class PackageGroup {
-    private String name;
-    private List<Package> packages = new ArrayList<Package>();;
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public List<Package> getPackages() {
-        return packages;
-    }
-
-    public void addPackage(Package p) {
-        packages.add(p);
-    }
-
-    public void setPackages(List<Package> packages) {
-        this.packages = packages;
-    }
-}
-
 public class Main {
     public static List<Package> repo;
     public static ArrayList<String> posConstraints;
@@ -107,12 +82,16 @@ public class Main {
 
     public static void solve(List<String> initial, List<String> constraints) {
         JSONArray com = new JSONArray();
+
         if (constraints.size() == 0) {
-            System.out.println(com);
+            System.out.println(JSON.toJSONString(com));
             return;
         }
 
         if (initial.size() != 0) {
+            // Initial state is therefore not empty, process it differently?
+            // May not even need to process it differently tbh
+            // For now, fuck this bit
             System.out.println("Initial state is not empty, unable to solve right now");
             return;
         }
@@ -121,36 +100,17 @@ public class Main {
         posConstraints = cons.get(0);
         negConstraints = cons.get(1);
 
-        repo.sort(Comparator.comparing(Package::getName));
-        ArrayList<PackageGroup> packageList = new ArrayList<PackageGroup>();
-        for (Package p : repo) {
-            if (packageList.stream().anyMatch(packGroup -> p.getName().equals(packGroup.getName()))) {
-                PackageGroup packageGroup = packageList.stream()
-                        .filter(packGroup -> p.getName().equals(packGroup.getName())).findFirst().orElse(null);
-                int index = packageList.indexOf(packageGroup);
-                packageGroup.addPackage(p);
-                packageList.set(index, packageGroup);
-            } else {
-                PackageGroup packageGroup = new PackageGroup();
-                packageGroup.setName(p.getName());
-                packageGroup.addPackage(p);
-                packageList.add(packageGroup);
-            }
-        }
-        for (PackageGroup pg : packageList) {
-            pg.getPackages().sort(Comparator.comparing(Package::getSize));
-        }
-
         depthFirstSearch(initial);
 
         if (!finalStates.isEmpty()) {
             List<String> bestFinalState = finalStates.get(0);
             int bestSize = 0;
             for (List<String> fState : finalStates) {
-                
+                // List<String> currentState = new ArrayList<String>();
+                // Find the cheapest (smallest) finalState by adding up the sizes
                 int currentSize = 0;
-                
-                for (String s: fState) {
+
+                for (String s : fState) {
                     Package pack = parsePackageFromStateString(s);
                     currentSize += pack.getSize();
                 }
@@ -160,17 +120,17 @@ public class Main {
                     bestFinalState = fState;
                 }
             }
-            
+
             List<String> commands = new ArrayList<String>();
 
-            for (String s: bestFinalState) {
+            for (String s : bestFinalState) {
                 commands.add("+" + s);
             }
 
-            System.out.println(commands);
+            System.out.println(JSON.toJSONString(commands));
 
         } else {
-            System.out.println(com);
+            System.out.println(JSON.toJSONString(com));
         }
     }
 
@@ -186,6 +146,8 @@ public class Main {
             seenStates.add(state);
         }
 
+        // TODO: This could catch me out, if the starting state isn't valid to begin
+        // with? - Becareful of this maybe
         if (!state.isEmpty() && !isValidState(state)) {
             return state;
         }
@@ -205,7 +167,6 @@ public class Main {
                 newState.remove(pack);
             } else {
                 newState.add(pack);
-            
             }
 
             search(newState);
@@ -215,8 +176,6 @@ public class Main {
     }
 
     public static boolean isValidState(List<String> state) {
-        boolean isValid = true;
-
         List<Package> packages = new ArrayList<Package>();
 
         for (String s : state) {
@@ -225,7 +184,6 @@ public class Main {
         }
 
         for (Package pack : packages) {
-           
             if (pack != null) {
                 if (!pack.getConflicts().isEmpty()) {
                     for (String conf : pack.getConflicts()) {
@@ -234,30 +192,30 @@ public class Main {
                         }
                     }
                 }
-        
+
                 if (!pack.getDepends().isEmpty()) {
                     for (List<String> depList : pack.getDepends()) {
-                    
                         if (isMissingDependency(depList, packages)) {
                             return false;
                         }
                     }
                 }
             } else {
-
+                // Package does not exist, so it is wrong? - This should not ever happen, more
+                // of a fail safe I guess?
                 return false;
             }
         }
 
-        return isValid;
+        return true;
     }
 
     public static boolean isConflicting(String conflict, List<Package> state) {
-
         if (conflict.contains("<=")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-           
+            // This will likely conflict when comparing versions with decimals (e.g. v1 and
+            // v0.1.3)?
             if (state.stream()
                     .filter(p -> Integer.parseInt(p.getVersion()) <= packageVersion && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
@@ -266,7 +224,8 @@ public class Main {
         } else if (conflict.contains(">=")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-            
+            // This will likely conflict when comparing versions with decimals (e.g. v1 and
+            // v0.1.3)?
             if (state.stream()
                     .filter(p -> Integer.parseInt(p.getVersion()) >= packageVersion && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
@@ -275,7 +234,8 @@ public class Main {
         } else if (conflict.contains("<")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("<") + 1));
-           
+            // This will likely conflict when comparing versions with decimals (e.g. v1 and
+            // v0.1.3)?
             if (state.stream()
                     .filter(p -> Integer.parseInt(p.getVersion()) < packageVersion && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
@@ -284,7 +244,8 @@ public class Main {
         } else if (conflict.contains(">")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf(">") + 1));
-            
+            // This will likely conflict when comparing versions with decimals (e.g. v1 and
+            // v0.1.3)?
             if (state.stream()
                     .filter(p -> Integer.parseInt(p.getVersion()) > packageVersion && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
@@ -313,7 +274,8 @@ public class Main {
             if (dep.contains("<=")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("=") + 1));
-    
+                // This will likely conflict when comparing versions with decimals (e.g. v1 and
+                // v0.1.3)?
                 if (state.stream().filter(
                         p -> Integer.parseInt(p.getVersion()) <= packageVersion && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
@@ -322,7 +284,8 @@ public class Main {
             } else if (dep.contains(">=")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("=") + 1));
-
+                // This will likely conflict when comparing versions with decimals (e.g. v1 and
+                // v0.1.3)?
                 if (state.stream().filter(
                         p -> Integer.parseInt(p.getVersion()) >= packageVersion && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
@@ -331,6 +294,8 @@ public class Main {
             } else if (dep.contains("<")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("<") + 1));
+                // This will likely conflict when comparing versions with decimals (e.g. v1 and
+                // v0.1.3)?
                 if (state.stream().filter(
                         p -> Integer.parseInt(p.getVersion()) < packageVersion && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
@@ -339,6 +304,8 @@ public class Main {
             } else if (dep.contains(">")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf(">") + 1));
+                // This will likely conflict when comparing versions with decimals (e.g. v1 and
+                // v0.1.3)?
                 if (state.stream().filter(
                         p -> Integer.parseInt(p.getVersion()) > packageVersion && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
