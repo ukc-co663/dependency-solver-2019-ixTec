@@ -121,6 +121,8 @@ public class Main {
                 List<Package> currentPackages = new ArrayList<Package>(initialPackages);
                 List<String> currentCommands = new ArrayList<String>();
 
+                System.out.println("Final State: " + fState);
+
                 int currentSize = 0;
 
                 for (String s : fState) {
@@ -147,6 +149,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    System.out.println("Adding uninstall");
                                     currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains(">=")) {
@@ -163,6 +166,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    System.out.println("Adding uninstall");
                                     currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains("<")) {
@@ -179,6 +183,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    System.out.println("Adding uninstall");
                                     currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains(">")) {
@@ -196,6 +201,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    System.out.println("Adding uninstall");
                                     currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains("=")) {
@@ -212,7 +218,22 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    System.out.println("Adding uninstall");
                                     currentSize += UNINSTALL_SIZE;
+                                }
+                            } else {
+
+                                if (currentPackages.stream().filter(p -> p.getName().equals(conflict)).findFirst()
+                                        .isPresent()) {
+
+                                    List<Package> cs = currentPackages.stream()
+                                            .filter(p -> p.getName().equals(conflict)).collect(Collectors.toList());
+
+                                    for (Package cPack : cs) {
+                                        currentCommands.add("-" + cPack.getName() + "=" + cPack.getVersion());
+                                        System.out.println("Adding uninstall");
+                                        currentSize += UNINSTALL_SIZE;
+                                    }
                                 }
                             }
                         }
@@ -405,7 +426,7 @@ public class Main {
             String packageName = conflict;
 
             if (state.stream().filter(p -> p.getName().equals(packageName)).findFirst().isPresent()) {
-                return false;
+                return true;
             }
         }
 
