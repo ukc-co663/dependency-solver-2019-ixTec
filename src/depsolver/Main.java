@@ -67,6 +67,9 @@ public class Main {
 
     public static HashSet<List<String>> seenStates = new HashSet<>();
     public static boolean isFinal = false;
+    public static String vers;
+
+    public final int UNINSTALL_SIZE = 1000000;
 
     public static void main(String[] args) throws IOException {
         TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {
@@ -89,11 +92,10 @@ public class Main {
         }
 
         if (initial.size() != 0) {
-            // Initial state is therefore not empty, process it differently?
-            // May not even need to process it differently tbh
-            // For now, fuck this bit
-            System.out.println("Initial state is not empty, unable to solve right now");
-            return;
+            if (!isValidState(initial)) {
+                System.out.println("Initial state is not valid, ignore this for now");
+                return;
+            }
         }
 
         ArrayList<ArrayList<String>> cons = splitConstraints(constraints);
@@ -104,30 +106,129 @@ public class Main {
 
         if (!finalStates.isEmpty()) {
             List<String> bestFinalState = finalStates.get(0);
+            List<String> bestCommands = new ArrayList<String>();
             int bestSize = 0;
+
+            List<Package> initialPackages = new ArrayList<Package>();
+
+            for (String s : initial) {
+                Package p = parsePackageFromStateString(s);
+                initialPackages.add(p);
+            }
+
             for (List<String> fState : finalStates) {
-                // List<String> currentState = new ArrayList<String>();
-                // Find the cheapest (smallest) finalState by adding up the sizes
+                List<String> currentState = new ArrayList<String>(initial);
+                List<Package> currentPackages = new ArrayList<Package>(initialPackages);
+                List<String> currentCommands = new ArrayList<String>();
+
                 int currentSize = 0;
 
                 for (String s : fState) {
                     Package pack = parsePackageFromStateString(s);
+                    currentState.add(s);
+
+                    List<String> conflicts = pack.getConflicts();
+
+                    for (String conflict : conflicts) {
+                        currentPackages.add(pack);
+
+                        if (isConflicting(conflict, currentPackages) || isConflicting(conflict, initialPackages)) {
+                            if (conflict.contains("<=")) {
+                                String packageName = conflict.substring(0, conflict.indexOf("<"));
+                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+                                if (currentPackages.stream()
+                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
+                                                && p.getName().equals(packageName))
+                                        .findFirst().isPresent()) {
+                                    Package foundPackage = currentPackages.stream()
+                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
+                                                    && p.getName().equals(packageName))
+                                            .findFirst().orElse(null);
+
+                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+
+                                }
+                            } else if (conflict.contains(">=")) {
+                                String packageName = conflict.substring(0, conflict.indexOf(">"));
+                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+                                if (currentPackages.stream()
+                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
+                                                && p.getName().equals(packageName))
+                                        .findFirst().isPresent()) {
+                                    Package foundPackage = currentPackages.stream()
+                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
+                                                    && p.getName().equals(packageName))
+                                            .findFirst().orElse(null);
+
+                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+
+                                }
+                            } else if (conflict.contains("<")) {
+                                String packageName = conflict.substring(0, conflict.indexOf("<"));
+                                String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
+
+                                if (currentPackages.stream()
+                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
+                                                && p.getName().equals(packageName))
+                                        .findFirst().isPresent()) {
+                                    Package foundPackage = currentPackages.stream()
+                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
+                                                    && p.getName().equals(packageName))
+                                            .findFirst().orElse(null);
+
+                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+
+                                }
+                            } else if (conflict.contains(">")) {
+                                String packageName = conflict.substring(0, conflict.indexOf(">"));
+                                String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
+
+                                if (currentPackages.stream()
+                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
+                                                && p.getName().equals(packageName))
+                                        .findFirst().isPresent()) {
+
+                                    Package foundPackage = currentPackages.stream()
+                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
+                                                    && p.getName().equals(packageName))
+                                            .findFirst().orElse(null);
+
+                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                }
+                            } else if (conflict.contains("=")) {
+                                String packageName = conflict.substring(0, conflict.indexOf("="));
+                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+                                if (currentPackages.stream()
+                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
+                                                && p.getName().equals(packageName))
+                                        .findFirst().isPresent()) {
+                                    Package foundPackage = currentPackages.stream()
+                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
+                                                    && p.getName().equals(packageName))
+                                            .findFirst().orElse(null);
+
+                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+
+                                }
+                            }
+                        }
+                    }
+
+                    currentCommands.add("+" + pack.getName() + "=" + pack.getVersion());
                     currentSize += pack.getSize();
                 }
 
                 if (currentSize < bestSize || bestSize == 0) {
                     bestSize = currentSize;
                     bestFinalState = fState;
+                    bestCommands = currentCommands;
                 }
             }
 
-            List<String> commands = new ArrayList<String>();
-
-            for (String s : bestFinalState) {
-                commands.add("+" + s);
-            }
-
-            System.out.println(JSON.toJSONString(commands));
+            System.out.println(JSON.toJSONString(bestCommands));
 
         } else {
             System.out.println(JSON.toJSONString(com));
@@ -160,7 +261,6 @@ public class Main {
 
         for (Package p : repo) {
             ArrayList<String> newState = new ArrayList<>(state);
-
             String pack = p.getName() + "=" + p.getVersion();
 
             if (newState.contains(pack)) {
@@ -210,57 +310,99 @@ public class Main {
         return true;
     }
 
+    // Return true is v1 is <comparison> to v2
+    public static boolean compareVersions(String v1, String v2, String comparison) {
+        String[] v1Parts = v1.split("\\.");
+        String[] v2Parts = v2.split("\\.");
+
+        int length = Math.max(v1Parts.length, v2Parts.length);
+
+        for (int i = 0; i < length; i++) {
+            int v1Part = i < v1Parts.length ? Integer.parseInt(v1Parts[i]) : 0;
+            int v2Part = i < v2Parts.length ? Integer.parseInt(v2Parts[i]) : 0;
+
+            if (comparison == "<=") {
+                if (v1Part > v2Part) {
+                    return false;
+                }
+            } else if (comparison == ">=") {
+                if (v1Part < v2Part) {
+                    return false;
+                }
+            } else if (comparison == "<") {
+                if (v1Part < v2Part) {
+                    return true;
+                } else if (i == length - 1 && v1Part >= v2Part) {
+                    return false;
+                }
+            } else if (comparison == ">") {
+                if (v1Part > v2Part) {
+                    return true;
+                } else if (i == length - 1 && v1Part <= v2Part) {
+                    return false;
+                }
+            } else if (comparison == "=") {
+                if (v1Part != v2Part) {
+                    return false;
+                }
+            }
+        }
+
+        vers = v1;
+
+        // System.out.println(v1 + " is " + comparison + v2);
+        return true;
+    }
+
     public static boolean isConflicting(String conflict, List<Package> state) {
         if (conflict.contains("<=")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
-            int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-            // This will likely conflict when comparing versions with decimals (e.g. v1 and
-            // v0.1.3)?
-            if (state.stream()
-                    .filter(p -> Integer.parseInt(p.getVersion()) <= packageVersion && p.getName().equals(packageName))
+            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+            if (state.stream().filter(
+                    p -> compareVersions(p.getVersion(), packageVersion, "<=") && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
                 return true;
             }
         } else if (conflict.contains(">=")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
-            int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-            // This will likely conflict when comparing versions with decimals (e.g. v1 and
-            // v0.1.3)?
-            if (state.stream()
-                    .filter(p -> Integer.parseInt(p.getVersion()) >= packageVersion && p.getName().equals(packageName))
+            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+            if (state.stream().filter(
+                    p -> compareVersions(p.getVersion(), packageVersion, ">=") && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
                 return true;
             }
         } else if (conflict.contains("<")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
-            int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("<") + 1));
-            // This will likely conflict when comparing versions with decimals (e.g. v1 and
-            // v0.1.3)?
-            if (state.stream()
-                    .filter(p -> Integer.parseInt(p.getVersion()) < packageVersion && p.getName().equals(packageName))
+            String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
+
+            if (state.stream().filter(
+                    p -> compareVersions(p.getVersion(), packageVersion, "<") && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
                 return true;
             }
         } else if (conflict.contains(">")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
-            int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf(">") + 1));
-            // This will likely conflict when comparing versions with decimals (e.g. v1 and
-            // v0.1.3)?
-            if (state.stream()
-                    .filter(p -> Integer.parseInt(p.getVersion()) > packageVersion && p.getName().equals(packageName))
+            String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
+
+            if (state.stream().filter(
+                    p -> compareVersions(p.getVersion(), packageVersion, ">") && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
                 return true;
             }
         } else if (conflict.contains("=")) {
             String packageName = conflict.substring(0, conflict.indexOf("="));
-            int packageVersion = Integer.parseInt(conflict.substring(conflict.lastIndexOf("=") + 1));
-            if (state.stream()
-                    .filter(p -> p.getName().equals(packageName) && Integer.parseInt(p.getVersion()) == packageVersion)
+            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+
+            if (state.stream().filter(
+                    p -> compareVersions(p.getVersion(), packageVersion, "=") && p.getName().equals(packageName))
                     .findFirst().isPresent()) {
                 return true;
             }
         } else {
             String packageName = conflict;
+
             if (state.stream().filter(p -> p.getName().equals(packageName)).findFirst().isPresent()) {
                 return false;
             }
@@ -273,49 +415,46 @@ public class Main {
         for (String dep : depList) {
             if (dep.contains("<=")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
-                int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("=") + 1));
-                // This will likely conflict when comparing versions with decimals (e.g. v1 and
-                // v0.1.3)?
+                String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
+
                 if (state.stream().filter(
-                        p -> Integer.parseInt(p.getVersion()) <= packageVersion && p.getName().equals(packageName))
+                        p -> compareVersions(p.getVersion(), packageVersion, "<=") && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
                     return false;
                 }
             } else if (dep.contains(">=")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
-                int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("=") + 1));
-                // This will likely conflict when comparing versions with decimals (e.g. v1 and
-                // v0.1.3)?
+                String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
+
                 if (state.stream().filter(
-                        p -> Integer.parseInt(p.getVersion()) >= packageVersion && p.getName().equals(packageName))
+                        p -> compareVersions(p.getVersion(), packageVersion, ">=") && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
                     return false;
                 }
             } else if (dep.contains("<")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
-                int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("<") + 1));
-                // This will likely conflict when comparing versions with decimals (e.g. v1 and
-                // v0.1.3)?
+                String packageVersion = dep.substring(dep.lastIndexOf("<") + 1);
+
                 if (state.stream().filter(
-                        p -> Integer.parseInt(p.getVersion()) < packageVersion && p.getName().equals(packageName))
+                        p -> compareVersions(p.getVersion(), packageVersion, "<") && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
                     return false;
                 }
             } else if (dep.contains(">")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
-                int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf(">") + 1));
-                // This will likely conflict when comparing versions with decimals (e.g. v1 and
-                // v0.1.3)?
+                String packageVersion = dep.substring(dep.lastIndexOf(">") + 1);
+
                 if (state.stream().filter(
-                        p -> Integer.parseInt(p.getVersion()) > packageVersion && p.getName().equals(packageName))
+                        p -> compareVersions(p.getVersion(), packageVersion, ">") && p.getName().equals(packageName))
                         .findFirst().isPresent()) {
                     return false;
                 }
             } else if (dep.contains("=")) {
                 String packageName = dep.substring(0, dep.indexOf("="));
-                int packageVersion = Integer.parseInt(dep.substring(dep.lastIndexOf("=") + 1));
+                String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
+
                 if (state.stream().filter(
-                        p -> p.getName().equals(packageName) && Integer.parseInt(p.getVersion()) == packageVersion)
+                        p -> p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "="))
                         .findFirst().isPresent()) {
                     return false;
                 }
