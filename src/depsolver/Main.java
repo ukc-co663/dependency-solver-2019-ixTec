@@ -69,7 +69,7 @@ public class Main {
     public static boolean isFinal = false;
     public static String vers;
 
-    public final int UNINSTALL_SIZE = 1000000;
+    public static final int UNINSTALL_SIZE = 1000000;
 
     public static void main(String[] args) throws IOException {
         TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {
@@ -147,7 +147,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-
+                                    currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains(">=")) {
                                 String packageName = conflict.substring(0, conflict.indexOf(">"));
@@ -163,7 +163,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-
+                                    currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains("<")) {
                                 String packageName = conflict.substring(0, conflict.indexOf("<"));
@@ -179,7 +179,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-
+                                    currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains(">")) {
                                 String packageName = conflict.substring(0, conflict.indexOf(">"));
@@ -196,6 +196,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                    currentSize += UNINSTALL_SIZE;
                                 }
                             } else if (conflict.contains("=")) {
                                 String packageName = conflict.substring(0, conflict.indexOf("="));
@@ -211,7 +212,7 @@ public class Main {
                                             .findFirst().orElse(null);
 
                                     currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-
+                                    currentSize += UNINSTALL_SIZE;
                                 }
                             }
                         }
