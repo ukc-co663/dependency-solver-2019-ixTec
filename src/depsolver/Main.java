@@ -102,10 +102,10 @@ public class Main {
         posConstraints = cons.get(0);
         negConstraints = cons.get(1);
 
-        depthFirstSearch(initial);
+        seenStates.add(initial);
+        search(initial);
 
-        if (!finalStates.isEmpty()) {
-            List<String> bestFinalState = finalStates.get(0);
+        List<String> bestFinalState = finalStates.get(0);
             List<String> bestCommands = new ArrayList<String>();
             int bestSize = 0;
 
@@ -243,33 +243,23 @@ public class Main {
 
             System.out.println(JSON.toJSONString(bestCommands));
 
-        } else {
-            System.out.println(JSON.toJSONString(com));
-        }
     }
 
-    public static void depthFirstSearch(List<String> initial) {
-        List<String> finalState = new ArrayList<String>();
-        finalState = search(initial);
-    }
-
-    public static List<String> search(List<String> state) {
-        if (seenStates.contains(state)) {
-            return state;
-        } else {
-            seenStates.add(state);
-        }
-
+    public static void search(List<String> state) {
         // TODO: This could catch me out, if the starting state isn't valid to begin
         // with? - Becareful of this maybe
         if (!state.isEmpty() && !isValidState(state)) {
-            return state;
+            return;
         }
 
         if (!state.isEmpty() && isFinalState(state)) {
             finalStates.add(new ArrayList<String>(state));
 
-            return state;
+            return;
+        }
+
+        if(state.size() > repo.size()) {
+            return;
         }
 
         for (Package p : repo) {
@@ -282,10 +272,15 @@ public class Main {
                 newState.add(pack);
             }
 
-            search(newState);
+            if (seenStates.contains(newState)) {
+                continue;
+            } else {
+                seenStates.add(newState);
+                search(newState);
+            }            
         }
 
-        return state;
+        return;
     }
 
     public static boolean isValidState(List<String> state) {
@@ -323,7 +318,6 @@ public class Main {
         return true;
     }
 
-    // Return true is v1 is <comparison> to v2
     public static boolean compareVersions(String v1, String v2, String comparison) {
         String[] v1Parts = v1.split("\\.");
         String[] v2Parts = v2.split("\\.");
@@ -372,52 +366,54 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            if (state.stream().filter(
-                    p -> compareVersions(p.getVersion(), packageVersion, "<=") && p.getName().equals(packageName))
-                    .findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
+                    return true;
+                }
             }
         } else if (conflict.contains(">=")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            if (state.stream().filter(
-                    p -> compareVersions(p.getVersion(), packageVersion, ">=") && p.getName().equals(packageName))
-                    .findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
+                    return true;
+                }
             }
         } else if (conflict.contains("<")) {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
 
-            if (state.stream().filter(
-                    p -> compareVersions(p.getVersion(), packageVersion, "<") && p.getName().equals(packageName))
-                    .findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
+                    return true;
+                }
             }
         } else if (conflict.contains(">")) {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
 
-            if (state.stream().filter(
-                    p -> compareVersions(p.getVersion(), packageVersion, ">") && p.getName().equals(packageName))
-                    .findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
+                    return true;
+                }
             }
         } else if (conflict.contains("=")) {
             String packageName = conflict.substring(0, conflict.indexOf("="));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            if (state.stream().filter(
-                    p -> compareVersions(p.getVersion(), packageVersion, "=") && p.getName().equals(packageName))
-                    .findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
+                    return true;
+                }
             }
         } else {
             String packageName = conflict;
 
-            if (state.stream().filter(p -> p.getName().equals(packageName)).findFirst().isPresent()) {
-                return true;
+            for(Package p : state) {
+                if(p.getName().equals(packageName)) {
+                    return true;
+                }
             }
         }
 
@@ -430,53 +426,54 @@ public class Main {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                if (state.stream().filter(
-                        p -> compareVersions(p.getVersion(), packageVersion, "<=") && p.getName().equals(packageName))
-                        .findFirst().isPresent()) {
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
+                        return false;
+                    }
                 }
             } else if (dep.contains(">=")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                if (state.stream().filter(
-                        p -> compareVersions(p.getVersion(), packageVersion, ">=") && p.getName().equals(packageName))
-                        .findFirst().isPresent()) {
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
+                        return false;
+                    }
                 }
             } else if (dep.contains("<")) {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 String packageVersion = dep.substring(dep.lastIndexOf("<") + 1);
 
-                if (state.stream().filter(
-                        p -> compareVersions(p.getVersion(), packageVersion, "<") && p.getName().equals(packageName))
-                        .findFirst().isPresent()) {
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
+                        return false;
+                    }
                 }
             } else if (dep.contains(">")) {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 String packageVersion = dep.substring(dep.lastIndexOf(">") + 1);
 
-                if (state.stream().filter(
-                        p -> compareVersions(p.getVersion(), packageVersion, ">") && p.getName().equals(packageName))
-                        .findFirst().isPresent()) {
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
+                        return false;
+                    }
                 }
             } else if (dep.contains("=")) {
                 String packageName = dep.substring(0, dep.indexOf("="));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                if (state.stream().filter(
-                        p -> p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "="))
-                        .findFirst().isPresent()) {
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
+                        return false;
+                    }
                 }
             } else {
                 String packageName = dep;
 
-                if (state.stream().filter(p -> p.getName().equals(packageName)).findFirst().isPresent()) {
-
-                    return false;
+                for(Package p : state) {
+                    if(p.getName().equals(packageName)) {
+                        return false;
+                    }
                 }
             }
         }
@@ -511,21 +508,22 @@ public class Main {
     }
 
     public static Package parsePackageFromStateString(String state) {
+        Package pack = null;
         if (state.contains("=")) {
             String[] pieces = state.split("=");
             String pName = pieces[0];
             String pVer = pieces[1];
 
-            Package pack = repo.stream().filter(p -> p.getName().equals(pName) && p.getVersion().equals(pVer))
-                    .findFirst().orElse(null);
-
-            if (pack != null) {
-                return pack;
-            } else {
-                return null;
+            for(Package p : repo) {
+                if(p.getName().equals(pName) && p.getVersion().equals(pVer)) {
+                    pack = p;
+                    break;
+                }
             }
+
+            return pack;
         } else {
-            return null;
+            return pack;
         }
     }
 
