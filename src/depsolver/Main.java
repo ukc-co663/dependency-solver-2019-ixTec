@@ -61,13 +61,14 @@ class Package {
 
 public class Main {
     public static List<Package> repo;
+    public static List<String> initial;
     public static ArrayList<String> posConstraints;
     public static ArrayList<String> negConstraints;
+    public static List<List<String>> allStates = new ArrayList<>();
     public static List<List<String>> finalStates = new ArrayList<>();
+    public static List<List<String>> finalCommands = new ArrayList<>();
 
     public static HashSet<List<String>> seenStates = new HashSet<>();
-    public static boolean isFinal = false;
-    public static String vers;
 
     public static final int UNINSTALL_SIZE = 1000000;
 
@@ -77,7 +78,7 @@ public class Main {
         repo = JSON.parseObject(readFile(args[0]), repoType);
         TypeReference<List<String>> strListType = new TypeReference<List<String>>() {
         };
-        List<String> initial = JSON.parseObject(readFile(args[1]), strListType);
+        initial = JSON.parseObject(readFile(args[1]), strListType);
         List<String> constraints = JSON.parseObject(readFile(args[2]), strListType);
 
         solve(initial, constraints);
@@ -102,185 +103,183 @@ public class Main {
         posConstraints = cons.get(0);
         negConstraints = cons.get(1);
 
-        seenStates.add(initial);
         search(initial);
 
         List<String> bestFinalState = finalStates.get(0);
-            List<String> bestCommands = new ArrayList<String>();
-            int bestSize = 0;
+        List<String> bestCommands = new ArrayList<String>();
+        int bestSize = 0;
 
-            List<Package> initialPackages = new ArrayList<Package>();
+        List<Package> initialPackages = new ArrayList<Package>();
 
-            for (String s : initial) {
-                Package p = parsePackageFromStateString(s);
-                initialPackages.add(p);
-            }
+        for (String s : initial) {
+            Package p = parsePackageFromStateString(s);
+            initialPackages.add(p);
+        }
 
-            for (List<String> fState : finalStates) {
-                List<String> currentState = new ArrayList<String>(initial);
-                List<Package> currentPackages = new ArrayList<Package>(initialPackages);
-                List<String> currentCommands = new ArrayList<String>();
-                int currentSize = 0;
+        for (List<String> fState : finalStates) {
+            List<String> currentState = new ArrayList<String>(initial);
+            List<Package> currentPackages = new ArrayList<Package>(initialPackages);
+            List<String> currentCommands = new ArrayList<String>();
+            int currentSize = 0;
 
-                for (String s : fState) {
-                    Package pack = parsePackageFromStateString(s);
-                    currentState.add(s);
+            for (String s : fState) {
+                Package pack = parsePackageFromStateString(s);
+                currentState.add(s);
 
-                    List<String> conflicts = pack.getConflicts();
+                List<String> conflicts = pack.getConflicts();
 
-                    for (String conflict : conflicts) {
-                        currentPackages.add(pack);
+                for (String conflict : conflicts) {
+                    currentPackages.add(pack);
 
-                        if (isConflicting(conflict, currentPackages) || isConflicting(conflict, initialPackages)) {
-                            if (conflict.contains("<=")) {
-                                String packageName = conflict.substring(0, conflict.indexOf("<"));
-                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+                    if (isConflicting(conflict, currentPackages) || isConflicting(conflict, initialPackages)) {
+                        if (conflict.contains("<=")) {
+                            String packageName = conflict.substring(0, conflict.indexOf("<"));
+                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-                                if (currentPackages.stream()
+                            if (currentPackages.stream()
+                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
+                                            && p.getName().equals(packageName))
+                                    .findFirst().isPresent()) {
+                                Package foundPackage = currentPackages.stream()
                                         .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
                                                 && p.getName().equals(packageName))
-                                        .findFirst().isPresent()) {
-                                    Package foundPackage = currentPackages.stream()
-                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
-                                                    && p.getName().equals(packageName))
-                                            .findFirst().orElse(null);
+                                        .findFirst().orElse(null);
 
-                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            } else if (conflict.contains(">=")) {
-                                String packageName = conflict.substring(0, conflict.indexOf(">"));
-                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
+                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentSize += UNINSTALL_SIZE;
+                            }
+                        } else if (conflict.contains(">=")) {
+                            String packageName = conflict.substring(0, conflict.indexOf(">"));
+                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-                                if (currentPackages.stream()
+                            if (currentPackages.stream()
+                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
+                                            && p.getName().equals(packageName))
+                                    .findFirst().isPresent()) {
+                                Package foundPackage = currentPackages.stream()
                                         .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
                                                 && p.getName().equals(packageName))
-                                        .findFirst().isPresent()) {
-                                    Package foundPackage = currentPackages.stream()
-                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
-                                                    && p.getName().equals(packageName))
-                                            .findFirst().orElse(null);
+                                        .findFirst().orElse(null);
 
-                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            } else if (conflict.contains("<")) {
-                                String packageName = conflict.substring(0, conflict.indexOf("<"));
-                                String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
+                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentSize += UNINSTALL_SIZE;
+                            }
+                        } else if (conflict.contains("<")) {
+                            String packageName = conflict.substring(0, conflict.indexOf("<"));
+                            String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
 
-                                if (currentPackages.stream()
+                            if (currentPackages.stream()
+                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
+                                            && p.getName().equals(packageName))
+                                    .findFirst().isPresent()) {
+                                Package foundPackage = currentPackages.stream()
                                         .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
                                                 && p.getName().equals(packageName))
-                                        .findFirst().isPresent()) {
-                                    Package foundPackage = currentPackages.stream()
-                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
-                                                    && p.getName().equals(packageName))
-                                            .findFirst().orElse(null);
+                                        .findFirst().orElse(null);
 
-                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            } else if (conflict.contains(">")) {
-                                String packageName = conflict.substring(0, conflict.indexOf(">"));
-                                String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
+                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentSize += UNINSTALL_SIZE;
+                            }
+                        } else if (conflict.contains(">")) {
+                            String packageName = conflict.substring(0, conflict.indexOf(">"));
+                            String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
 
-                                if (currentPackages.stream()
+                            if (currentPackages.stream()
+                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
+                                            && p.getName().equals(packageName))
+                                    .findFirst().isPresent()) {
+
+                                Package foundPackage = currentPackages.stream()
                                         .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
                                                 && p.getName().equals(packageName))
-                                        .findFirst().isPresent()) {
+                                        .findFirst().orElse(null);
 
-                                    Package foundPackage = currentPackages.stream()
-                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
-                                                    && p.getName().equals(packageName))
-                                            .findFirst().orElse(null);
+                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentSize += UNINSTALL_SIZE;
+                            }
+                        } else if (conflict.contains("=")) {
+                            String packageName = conflict.substring(0, conflict.indexOf("="));
+                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            } else if (conflict.contains("=")) {
-                                String packageName = conflict.substring(0, conflict.indexOf("="));
-                                String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                                if (currentPackages.stream()
+                            if (currentPackages.stream()
+                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
+                                            && p.getName().equals(packageName))
+                                    .findFirst().isPresent()) {
+                                Package foundPackage = currentPackages.stream()
                                         .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
                                                 && p.getName().equals(packageName))
-                                        .findFirst().isPresent()) {
-                                    Package foundPackage = currentPackages.stream()
-                                            .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
-                                                    && p.getName().equals(packageName))
-                                            .findFirst().orElse(null);
+                                        .findFirst().orElse(null);
 
-                                    currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
+                                currentSize += UNINSTALL_SIZE;
+                            }
+                        } else {
+
+                            if (currentPackages.stream().filter(p -> p.getName().equals(conflict)).findFirst()
+                                    .isPresent()) {
+
+                                List<Package> cs = currentPackages.stream().filter(p -> p.getName().equals(conflict))
+                                        .collect(Collectors.toList());
+
+                                for (Package cPack : cs) {
+                                    currentCommands.add("-" + cPack.getName() + "=" + cPack.getVersion());
                                     currentSize += UNINSTALL_SIZE;
-                                }
-                            } else {
-
-                                if (currentPackages.stream().filter(p -> p.getName().equals(conflict)).findFirst()
-                                        .isPresent()) {
-
-                                    List<Package> cs = currentPackages.stream()
-                                            .filter(p -> p.getName().equals(conflict)).collect(Collectors.toList());
-
-                                    for (Package cPack : cs) {
-                                        currentCommands.add("-" + cPack.getName() + "=" + cPack.getVersion());
-                                        currentSize += UNINSTALL_SIZE;
-                                    }
                                 }
                             }
                         }
                     }
-
-                    currentCommands.add("+" + pack.getName() + "=" + pack.getVersion());
-                    currentSize += pack.getSize();
                 }
 
-                if (currentSize < bestSize || bestSize == 0) {
-                    bestSize = currentSize;
-                    bestFinalState = fState;
-                    bestCommands = currentCommands;
-                }
+                currentCommands.add("+" + pack.getName() + "=" + pack.getVersion());
+                currentSize += pack.getSize();
             }
 
-            System.out.println(JSON.toJSONString(bestCommands));
+            if (currentSize < bestSize || bestSize == 0) {
+                bestSize = currentSize;
+                bestFinalState = fState;
+                bestCommands = currentCommands;
+            }
+        }
+
+        System.out.println(JSON.toJSONString(bestCommands));
 
     }
 
-    public static void search(List<String> state) {
-        // TODO: This could catch me out, if the starting state isn't valid to begin
-        // with? - Becareful of this maybe
-        if (!state.isEmpty() && !isValidState(state)) {
-            return;
-        }
-
-        if (!state.isEmpty() && isFinalState(state)) {
-            finalStates.add(new ArrayList<String>(state));
-
-            return;
-        }
-
-        if(state.size() > repo.size()) {
-            return;
+    public static List<String> search(List<String> state) {
+        
+        if (seenStates.contains(state)) {
+            return state;
+        } else {
+            seenStates.add(state);
         }
 
         for (Package p : repo) {
-            ArrayList<String> newState = new ArrayList<>(state);
+            List<String> newState = new ArrayList<>(state);
             String pack = p.getName() + "=" + p.getVersion();
 
-            if (newState.contains(pack)) {
+            if (state.contains(pack) && initial.contains(pack)) {
+
                 newState.remove(pack);
+            } else if(state.contains(pack)) {
             } else {
                 newState.add(pack);
             }
 
-            if (seenStates.contains(newState)) {
+            if (!isValidState(newState)) {
                 continue;
-            } else {
-                seenStates.add(newState);
-                search(newState);
-            }            
+            }  
+            
+            //System.out.println("State: " + state);
+
+            if (isFinalState(newState)) {
+                finalStates.add(new ArrayList<String>(newState));
+                continue;
+            }
+
+            newState = search(newState);
         }
 
-        return;
+        return state;
     }
 
     public static boolean isValidState(List<String> state) {
@@ -355,9 +354,6 @@ public class Main {
             }
         }
 
-        vers = v1;
-
-        // System.out.println(v1 + " is " + comparison + v2);
         return true;
     }
 
@@ -366,8 +362,8 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
                     return true;
                 }
             }
@@ -375,8 +371,8 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
                     return true;
                 }
             }
@@ -384,8 +380,8 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf("<"));
             String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
                     return true;
                 }
             }
@@ -393,8 +389,8 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf(">"));
             String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
                     return true;
                 }
             }
@@ -402,16 +398,16 @@ public class Main {
             String packageName = conflict.substring(0, conflict.indexOf("="));
             String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
                     return true;
                 }
             }
         } else {
             String packageName = conflict;
 
-            for(Package p : state) {
-                if(p.getName().equals(packageName)) {
+            for (Package p : state) {
+                if (p.getName().equals(packageName)) {
                     return true;
                 }
             }
@@ -426,8 +422,8 @@ public class Main {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<=")) {
                         return false;
                     }
                 }
@@ -435,8 +431,8 @@ public class Main {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">=")) {
                         return false;
                     }
                 }
@@ -444,8 +440,8 @@ public class Main {
                 String packageName = dep.substring(0, dep.indexOf("<"));
                 String packageVersion = dep.substring(dep.lastIndexOf("<") + 1);
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "<")) {
                         return false;
                     }
                 }
@@ -453,25 +449,26 @@ public class Main {
                 String packageName = dep.substring(0, dep.indexOf(">"));
                 String packageVersion = dep.substring(dep.lastIndexOf(">") + 1);
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, ">")) {
                         return false;
                     }
                 }
             } else if (dep.contains("=")) {
+
                 String packageName = dep.substring(0, dep.indexOf("="));
                 String packageVersion = dep.substring(dep.lastIndexOf("=") + 1);
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName) && compareVersions(p.getVersion(), packageVersion, "=")) {
                         return false;
                     }
                 }
             } else {
                 String packageName = dep;
 
-                for(Package p : state) {
-                    if(p.getName().equals(packageName)) {
+                for (Package p : state) {
+                    if (p.getName().equals(packageName)) {
                         return false;
                     }
                 }
@@ -514,8 +511,8 @@ public class Main {
             String pName = pieces[0];
             String pVer = pieces[1];
 
-            for(Package p : repo) {
-                if(p.getName().equals(pName) && p.getVersion().equals(pVer)) {
+            for (Package p : repo) {
+                if (p.getName().equals(pName) && p.getVersion().equals(pVer)) {
                     pack = p;
                     break;
                 }
