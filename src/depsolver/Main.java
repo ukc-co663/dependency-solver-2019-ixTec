@@ -64,8 +64,6 @@ public class Main {
     public static List<String> initial;
     public static ArrayList<String> posConstraints;
     public static ArrayList<String> negConstraints;
-    public static List<List<String>> finalStates = new ArrayList<>();
-    public static List<List<String>> finalCommands = new ArrayList<>();
     public static HashSet<List<String>> seenStates = new HashSet<>();
     public static final int UNINSTALL_SIZE = 1000000;
     public static List<String> bestOverallCommands = new ArrayList<>();
@@ -104,12 +102,10 @@ public class Main {
 
         search(initial, new ArrayList<String>(), 0);
 
-        //System.out.println(JSON.toJSONString(bestCommands));
         System.out.println(JSON.toJSONString(bestOverallCommands));
     }
 
     public static List<String> search(List<String> state, List<String> commands, int size) {
-        // System.out.println("Depth: " + depth);
         if (seenStates.contains(state)) {
             return state;
         } else {
