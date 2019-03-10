@@ -64,13 +64,12 @@ public class Main {
     public static List<String> initial;
     public static ArrayList<String> posConstraints;
     public static ArrayList<String> negConstraints;
-    public static List<List<String>> allStates = new ArrayList<>();
     public static List<List<String>> finalStates = new ArrayList<>();
     public static List<List<String>> finalCommands = new ArrayList<>();
-
     public static HashSet<List<String>> seenStates = new HashSet<>();
-
     public static final int UNINSTALL_SIZE = 1000000;
+    public static List<String> bestOverallCommands = new ArrayList<>();
+    public static int bestOverallSize = 0;
 
     public static void main(String[] args) throws IOException {
         TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {
@@ -103,150 +102,14 @@ public class Main {
         posConstraints = cons.get(0);
         negConstraints = cons.get(1);
 
-        search(initial);
+        search(initial, new ArrayList<String>(), 0);
 
-        List<String> bestFinalState = finalStates.get(0);
-        List<String> bestCommands = new ArrayList<String>();
-        int bestSize = 0;
-
-        List<Package> initialPackages = new ArrayList<Package>();
-
-        for (String s : initial) {
-            Package p = parsePackageFromStateString(s);
-            initialPackages.add(p);
-        }
-
-        for (List<String> fState : finalStates) {
-            List<String> currentState = new ArrayList<String>(initial);
-            List<Package> currentPackages = new ArrayList<Package>(initialPackages);
-            List<String> currentCommands = new ArrayList<String>();
-            int currentSize = 0;
-
-            for (String s : fState) {
-                Package pack = parsePackageFromStateString(s);
-                currentState.add(s);
-
-                List<String> conflicts = pack.getConflicts();
-
-                for (String conflict : conflicts) {
-                    currentPackages.add(pack);
-
-                    if (isConflicting(conflict, currentPackages) || isConflicting(conflict, initialPackages)) {
-                        if (conflict.contains("<=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("<"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains(">=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf(">"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains("<")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("<"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains(">")) {
-                            String packageName = conflict.substring(0, conflict.indexOf(">"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains("=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("="));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else {
-
-                            if (currentPackages.stream().filter(p -> p.getName().equals(conflict)).findFirst()
-                                    .isPresent()) {
-
-                                List<Package> cs = currentPackages.stream().filter(p -> p.getName().equals(conflict))
-                                        .collect(Collectors.toList());
-
-                                for (Package cPack : cs) {
-                                    currentCommands.add("-" + cPack.getName() + "=" + cPack.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                currentCommands.add("+" + pack.getName() + "=" + pack.getVersion());
-                currentSize += pack.getSize();
-            }
-
-            if (currentSize < bestSize || bestSize == 0) {
-                bestSize = currentSize;
-                bestFinalState = fState;
-                bestCommands = currentCommands;
-            }
-        }
-
-        System.out.println(JSON.toJSONString(bestCommands));
-
+        //System.out.println(JSON.toJSONString(bestCommands));
+        System.out.println(JSON.toJSONString(bestOverallCommands));
     }
 
-    public static List<String> search(List<String> state) {
-        
+    public static List<String> search(List<String> state, List<String> commands, int size) {
+        // System.out.println("Depth: " + depth);
         if (seenStates.contains(state)) {
             return state;
         } else {
@@ -255,31 +118,77 @@ public class Main {
 
         for (Package p : repo) {
             List<String> newState = new ArrayList<>(state);
+            List<String> newCommands = new ArrayList<>(commands);
+            int currentSize = size;
             String pack = p.getName() + "=" + p.getVersion();
 
             if (state.contains(pack) && initial.contains(pack)) {
-
                 newState.remove(pack);
-            } else if(state.contains(pack)) {
+                newCommands.add("-" + pack);
+                currentSize += UNINSTALL_SIZE;
+            } else if (state.contains(pack) || initial.contains(pack)) {
+                newCommands.add("-" + pack);
+                currentSize += UNINSTALL_SIZE;
             } else {
                 newState.add(pack);
+                newCommands.add("+" + pack);
+                currentSize += p.getSize();
             }
 
             if (!isValidState(newState)) {
                 continue;
-            }  
-            
-            //System.out.println("State: " + state);
+            }
 
-            if (isFinalState(newState)) {
-                finalStates.add(new ArrayList<String>(newState));
+            if (bestOverallSize != 0) {
+                if (currentSize >= bestOverallSize) {
+                    continue;
+                }
+            }
+
+            if (isFinalState(newState)) {                
+                if (bestOverallSize != 0) {
+                    if (currentSize < bestOverallSize) {
+                        bestOverallSize = currentSize;
+                        bestOverallCommands = newCommands;
+                    }
+                } else {
+                    bestOverallSize = currentSize;
+                    bestOverallCommands = newCommands;
+                }
+
                 continue;
             }
 
-            newState = search(newState);
+            newState = search(newState, newCommands, currentSize);
         }
 
         return state;
+    }
+
+    public static int calculateSize(List<String> commands) {
+        int size = 0;
+
+        for (String command : commands) {
+            String sign = command.substring(0, 1);
+
+            if (sign.equals("-")) {
+                size += UNINSTALL_SIZE;
+            } else {
+                
+                String packageName = command.substring(1, command.indexOf("="));
+                String packageVersion = command.substring(command.lastIndexOf("=") + 1);
+
+                Package foundPackage = repo.stream().filter(
+                        p -> compareVersions(p.getVersion(), packageVersion, "=") && p.getName().equals(packageName))
+                        .findFirst().orElse(null);
+
+                if(foundPackage != null) {
+                    size += foundPackage.getSize();
+                }
+            }
+        }
+
+        return size;
     }
 
     public static boolean isValidState(List<String> state) {
