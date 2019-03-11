@@ -104,145 +104,7 @@ public class Main {
 
         search(initial, new ArrayList<String>());
 
-        List<String> bestFinalState = finalStates.get(0);
-        List<String> bestCommands = new ArrayList<String>();
-        int bestSize = 0;
-
-        List<Package> initialPackages = new ArrayList<Package>();
-
-        for (String s : initial) {
-            Package p = parsePackageFromStateString(s);
-            initialPackages.add(p);
-        }
-
-        for (List<String> fState : finalStates) {
-            List<String> currentState = new ArrayList<String>(initial);
-            List<Package> currentPackages = new ArrayList<Package>(initialPackages);
-            List<String> currentCommands = new ArrayList<String>();
-            int currentSize = 0;
-
-            for (String s : fState) {
-                Package pack = parsePackageFromStateString(s);
-                currentState.add(s);
-
-                List<String> conflicts = pack.getConflicts();
-
-                for (String conflict : conflicts) {
-                    currentPackages.add(pack);
-
-                    if (isConflicting(conflict, currentPackages) || isConflicting(conflict, initialPackages)) {
-                        if (conflict.contains("<=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("<"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains(">=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf(">"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains("<")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("<"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("<") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "<")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains(">")) {
-                            String packageName = conflict.substring(0, conflict.indexOf(">"));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf(">") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, ">")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else if (conflict.contains("=")) {
-                            String packageName = conflict.substring(0, conflict.indexOf("="));
-                            String packageVersion = conflict.substring(conflict.lastIndexOf("=") + 1);
-
-                            if (currentPackages.stream()
-                                    .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
-                                            && p.getName().equals(packageName))
-                                    .findFirst().isPresent()) {
-                                Package foundPackage = currentPackages.stream()
-                                        .filter(p -> compareVersions(p.getVersion(), packageVersion, "=")
-                                                && p.getName().equals(packageName))
-                                        .findFirst().orElse(null);
-
-                                currentCommands.add("-" + foundPackage.getName() + "=" + foundPackage.getVersion());
-                                currentSize += UNINSTALL_SIZE;
-                            }
-                        } else {
-
-                            if (currentPackages.stream().filter(p -> p.getName().equals(conflict)).findFirst()
-                                    .isPresent()) {
-
-                                List<Package> cs = currentPackages.stream().filter(p -> p.getName().equals(conflict))
-                                        .collect(Collectors.toList());
-
-                                for (Package cPack : cs) {
-                                    currentCommands.add("-" + cPack.getName() + "=" + cPack.getVersion());
-                                    currentSize += UNINSTALL_SIZE;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                currentCommands.add("+" + pack.getName() + "=" + pack.getVersion());
-                currentSize += pack.getSize();
-            }
-
-            if (currentSize < bestSize || bestSize == 0) {
-                bestSize = currentSize;
-                bestFinalState = fState;
-                bestCommands = currentCommands;
-            }
-        }
-
-        System.out.println(JSON.toJSONString(bestCommands));
-        System.out.println("BEST OVERALL COMMANDS: " + bestOverallCommands);
-
+        System.out.println(JSON.toJSONString(bestOverallCommands));
     }
 
     public static List<String> search(List<String> state, List<String> commands) {
@@ -272,9 +134,6 @@ public class Main {
                 continue;
             }
 
-            //System.out.println("State: " + newState);
-            //System.out.println("Commands: " + newCommands);
-
             if (!finalStates.isEmpty()) {
                 int currentSize = calculateSize(newCommands);
 
@@ -290,9 +149,6 @@ public class Main {
 
                 if (bestOverallSize != 0) {
                     if (currentSize < bestOverallSize) {
-                        //System.out.println("newCommands are better than previous best");
-                        //System.out.println("Previous Best: " + bestOverallCommands);
-                        //System.out.println("New Best: " + newCommands);
                         bestOverallSize = currentSize;
                         bestOverallCommands = newCommands;
                     }
